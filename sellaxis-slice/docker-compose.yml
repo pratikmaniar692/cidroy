@@ -1,0 +1,90 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: forgeline
+      POSTGRES_USER: forgeline
+      POSTGRES_PASSWORD: forgeline
+    volumes:
+      - ./migrations:/docker-entrypoint-initdb.d
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forgeline"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "5433:5432"
+
+  fake-sellaxis:
+    build: .
+    command: ["php", "-S", "0.0.0.0:8081", "fake-sellaxis/server.php"]
+    ports:
+      - "8081:8081"
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: forgeline
+      DB_USER: forgeline
+      DB_PASSWORD: forgeline
+      WEBHOOK_SECRET: dev-secret
+      SELLAXIS_BASE_URL: http://fake-sellaxis:8081
+      SELLAXIS_TOKEN: dev-token
+      ERP_BASE_URL: http://fake-sellaxis:8081
+    ports:
+      - "8080:8080"
+    command: ["php", "-S", "0.0.0.0:8080", "public/router.php"]
+
+  seed:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: forgeline
+      DB_USER: forgeline
+      DB_PASSWORD: forgeline
+    command: ["php", "src/Console/Seed.php"]
+
+  poller:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: forgeline
+      DB_USER: forgeline
+      DB_PASSWORD: forgeline
+      SELLAXIS_BASE_URL: http://fake-sellaxis:8081
+      SELLAXIS_TOKEN: dev-token
+    # Polls every 90s -- comfortably above the documented 60s floor.
+    # This is a backfill safety net (see README / Part A reasoning),
+    # not the primary ingestion path, so it's deliberately not aggressive.
+    entrypoint: ["sh", "-c", "while true; do php src/Console/PollSellaxis.php 2026-01-01T00:00:00+00:00; sleep 90; done"]
+
+  outbox-relay:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: forgeline
+      DB_USER: forgeline
+      DB_PASSWORD: forgeline
+      ERP_BASE_URL: http://fake-sellaxis:8081
+    entrypoint: ["sh", "-c", "while true; do php src/Console/ProcessOutbox.php; sleep 15; done"]
+
+volumes:
+  pgdata:

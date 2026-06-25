@@ -1,0 +1,25 @@
+{
+    "name": "forgeline/sellaxis-ingestion-slice",
+    "description": "Forgeline take-home Part C: marketplace event ingestion -> validation -> normalisation -> persistence -> idempotent processing -> order/line state tracking -> reconciliation API",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Forgeline\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Forgeline\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
